@@ -1,0 +1,58 @@
+# Environment files and credentials
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+*.pem
+*.key
+
+# Node.js and Next.js
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs and process state
+*.log
+logs/
+*.pid
+
+# Generated user data and processing artifacts
+uploads/
+temp/
+tmp/
+artifacts/
+backend/uploads/
+backend/temp/
+backend/tmp/
+backend/artifacts/
+backend/.data/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local pnpm store
+.pnpm-store/
