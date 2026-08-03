@@ -7,6 +7,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.models.error import ErrorDetail, ErrorResponse
+from app.services.errors import (
+    DuplicateUploadError,
+    InfrastructureError,
+    UploadValidationError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +90,69 @@ async def unexpected_exception_handler(
     )
 
 
+async def upload_validation_exception_handler(
+    request: Request, exception: Exception
+) -> JSONResponse:
+    if not isinstance(exception, UploadValidationError):
+        raise exception
+    logger.info(
+        "Upload rejected code=%s path=%s",
+        exception.code,
+        request.url.path,
+    )
+    return _error_response(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        code=exception.code,
+        message=exception.message,
+    )
+
+
+async def duplicate_upload_exception_handler(
+    request: Request, exception: Exception
+) -> JSONResponse:
+    if not isinstance(exception, DuplicateUploadError):
+        raise exception
+    message = "This file has already been uploaded."
+    if exception.existing_upload_id:
+        message += f" Existing upload ID: {exception.existing_upload_id}."
+    return _error_response(
+        status_code=status.HTTP_409_CONFLICT,
+        code="duplicate_upload",
+        message=message,
+    )
+
+
+async def infrastructure_exception_handler(
+    request: Request, exception: Exception
+) -> JSONResponse:
+    if not isinstance(exception, InfrastructureError):
+        raise exception
+    logger.error(
+        "Infrastructure operation failed code=%s path=%s",
+        exception.code,
+        request.url.path,
+    )
+    return _error_response(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        code=exception.code,
+        message=exception.message,
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register every application-wide exception mapping."""
+    app.add_exception_handler(
+        UploadValidationError,
+        upload_validation_exception_handler,
+    )
+    app.add_exception_handler(
+        DuplicateUploadError,
+        duplicate_upload_exception_handler,
+    )
+    app.add_exception_handler(
+        InfrastructureError,
+        infrastructure_exception_handler,
+    )
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unexpected_exception_handler)

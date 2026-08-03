@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     b2_bucket_name: str | None = None
     b2_endpoint: str | None = None
     b2_region: str | None = None
+    max_upload_size_bytes: int = 25 * 1024 * 1024
+    infrastructure_retry_attempts: int = 3
 
     model_config = SettingsConfigDict(
         env_file=BACKEND_DIRECTORY / ".env",

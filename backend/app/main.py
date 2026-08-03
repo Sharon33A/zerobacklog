@@ -11,6 +11,7 @@ from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
+from app.services.uploads import UploadService
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging(app_settings.log_level)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         logger.info(
             "Starting service=%s version=%s environment=%s",
             app_settings.service_name,
@@ -29,6 +30,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app_settings.app_env,
         )
         yield
+        application.state.upload_service.close()
         logger.info("Stopping service=%s", app_settings.service_name)
 
     application = FastAPI(
@@ -38,12 +40,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     application.state.settings = app_settings
+    application.state.upload_service = UploadService(app_settings)
 
     application.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "OPTIONS"],
+        allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Accept", "Content-Type"],
     )
     register_exception_handlers(application)

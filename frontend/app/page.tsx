@@ -1,4 +1,5 @@
 import { HealthStatus } from "@/components/health-status";
+import Link from "next/link";
 
 const pipelineStages = [
   { label: "Upload", detail: "Bring the backlog together" },
@@ -83,16 +84,15 @@ export default function Home() {
               learning path.
             </p>
             <div className="hero-actions">
-              <button
+              <Link
                 className="primary-button"
-                type="button"
-                disabled
                 aria-describedby="action-pack-status"
+                href="/upload"
               >
-                Create My Action Pack
+                Upload My Backlog
                 <ArrowIcon />
-              </button>
-              <p id="action-pack-status">Coming in the hackathon MVP</p>
+              </Link>
+              <p id="action-pack-status">PDF, image, text, or ZIP · up to 25 MB</p>
             </div>
           </div>
 
