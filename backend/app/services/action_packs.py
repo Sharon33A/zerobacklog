@@ -27,6 +27,7 @@ from app.models.action_pack import (
     EvidenceReference,
     LearnerProfile,
     OutputOption,
+    normalize_output_options,
 )
 from app.services.errors import InfrastructureError, ResourceActionError
 from app.services.readiness import build_signature
@@ -490,5 +491,5 @@ def response_from_record(record: ActionPackRecord) -> ActionPackResponse:
         result_object_key=record.result_object_key,
         generated_at=record.updated_at,
         action_pack=ActionPack.model_validate(record.result_json),
-        output_options=list(record.output_options),
+        output_options=normalize_output_options(record.output_options),
     )

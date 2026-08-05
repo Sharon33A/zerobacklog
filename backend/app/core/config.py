@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     log_level: str = "INFO"
     gemini_model: str = "gemini-2.5-flash"
-    gemini_image_model: str = "gemini-3.1-flash-image"
     gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
     gemini_voice_name: str = "Kore"
     generation_confidence_threshold: float = 0.72

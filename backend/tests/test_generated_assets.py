@@ -9,7 +9,6 @@ from app.services.generated_assets import (
     _inline_media,
     _is_retriable_google_error,
     _render_note,
-    _safe_generation_failure,
     _technical_evaluation,
 )
 
@@ -28,10 +27,10 @@ def test_expanded_profile_and_output_selection_contract() -> None:
             },
             "output_options": [
                 "complete_action_pack",
-                "visual_mind_map",
+                "learning_workflow",
                 "voice_lesson",
             ],
-            "visual_topics": ["Graphs"],
+            "workflow_focus_topics": ["Graphs"],
             "voice_mode": "quick_revision",
         }
     )
@@ -50,8 +49,8 @@ def test_inline_media_extracts_only_requested_modality() -> None:
                     parts=[
                         SimpleNamespace(
                             inline_data=SimpleNamespace(
-                                data=b"png-bytes",
-                                mime_type="image/png",
+                                data=b"audio-bytes",
+                                mime_type="audio/wav",
                             )
                         )
                     ]
@@ -60,14 +59,14 @@ def test_inline_media_extracts_only_requested_modality() -> None:
         ]
     )
 
-    data, mime_type = _inline_media(response, "image/")
+    data, mime_type = _inline_media(response, "audio/")
 
-    assert data == b"png-bytes"
-    assert mime_type == "image/png"
+    assert data == b"audio-bytes"
+    assert mime_type == "audio/wav"
 
 
 def test_small_output_receives_transparent_low_confidence_evaluation() -> None:
-    evaluation = _technical_evaluation(b"short", "image/png")
+    evaluation = _technical_evaluation(b"short", "application/json")
 
     assert evaluation.confidence < 0.72
     assert "unusually little" in evaluation.summary
@@ -101,14 +100,8 @@ def test_rendered_note_keeps_evidence_provenance() -> None:
     assert "source_derived" in rendered
 
 
-def test_image_quota_failure_is_exact_and_not_retried() -> None:
-    error = RuntimeError("429 RESOURCE_EXHAUSTED: quota limit 0")
+def test_transient_provider_throttling_is_a_retry_candidate() -> None:
+    error = RuntimeError("provider temporarily throttled")
     error.status_code = 429
 
-    message = _safe_generation_failure(error, "visual")
-
-    assert message == (
-        "Gemini returned 429 RESOURCE_EXHAUSTED: image-generation quota is "
-        "unavailable for the configured project."
-    )
-    assert _is_retriable_google_error(error) is False
+    assert _is_retriable_google_error(error) is True

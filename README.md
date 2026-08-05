@@ -34,8 +34,8 @@ Gemini compares only ready or approved resources to find repetition, unique insi
 - **Checks readiness before analysis:** detects corrupt, unreadable, unsupported, irrelevant, partial, low-confidence, inaccessible, and duplicate resources.
 - **Reduces knowledge across sources:** compares approved resources and grounds recommendations in resource IDs, titles, available locations, confidence, and evidence basis.
 - **Personalizes selected outputs:** the learner profile is optional, and any combination of seven output types can be requested.
-- **Generates useful media:** working voice lessons are evaluated and stored; the visual path reports provider failure when no image is verified.
-- **Regenerates selectively:** one note, visual, or voice lesson can be retried without rebuilding the pack.
+- **Builds useful learning assets:** the Action Pack becomes an interactive Learning Workflow and a playable voice lesson.
+- **Regenerates selectively:** one note, workflow, or voice lesson can be rebuilt without regenerating the pack.
 - **Records every attempt:** Every generation attempt is recorded. Successful assets receive immutable B2 versions, while failures remain visible in the audit history without replacing the latest working version.
 - **Packages the result:** current successful assets can be downloaded individually or as a combined ZIP.
 
@@ -76,11 +76,12 @@ The core product is **knowledge reduction**: spend less time repeating material 
 - **Resource Verdicts** — use fully, use selected sections, reference, or skip.
 - **Merged Notes** — concise notes, clues, mistakes, memory cues, and pseudocode.
 - **Priority Problems** — normalized must-do, useful, and optional problems.
+- **Learning Workflow** — an expandable, color-coded roadmap from Start Here to Interview Ready.
 - **Generated Voice** — normal or quick-revision WAV lessons.
 - **Version History** — compare, restore, inspect, and download any stored version.
 - **Downloads** — individual assets or a combined ZIP with `provenance.json`.
 
-The verified demo includes a completed multi-source Action Pack and two restorable voice versions. The visual pipeline exists, but the latest live image attempt returned `429 RESOURCE_EXHAUSTED`; no image was fabricated or stored as a success.
+The workflow is derived from the current Action Pack, not a static template: its topics, mistakes, problems, practice order, revision cues, evidence counts, and timing come from the learner's approved resources.
 
 ## Architecture
 
@@ -96,7 +97,7 @@ flowchart TB
 
     api -->|"Grounded structured analysis"| gemini["Gemini 2.5 Flash"]
     api -->|"Media jobs + lineage"| genblaze["Genblaze Pipeline"]
-    genblaze --> mediaModels["Gemini TTS / Image"]
+    genblaze --> mediaModels["Gemini TTS + Workflow Builder"]
 
     api -->|"Metadata, states, pointers"| neon[("Neon PostgreSQL")]
     neon --> api
@@ -123,7 +124,7 @@ B2 is the durable object layer for:
 - validated originals and extracted text;
 - readiness records, public-link snapshots, and link metadata;
 - completed Action Pack JSON;
-- generated voice and verified visual assets; and
+- Learning Workflow JSON and generated voice; and
 - Genblaze manifests and successful `vN` asset versions.
 
 Each write carries a SHA-256 value and is verified with an object metadata lookup. Neon stores the corresponding bucket, object key, checksum, status, version, and Genblaze run ID.
@@ -136,7 +137,7 @@ Combined ZIP downloads are currently assembled on demand from the current succes
 
 Genblaze is the execution and lineage layer for generated assets. Each selected output receives its own pipeline, grounded prompt, provider run, evaluation, B2 write, and manifest. Neon records the run ID, confidence, timing, settings, source references, and version.
 
-On regeneration, Neon links V2 to V1 and Genblaze loads the previous successful result when its manifest is available. Note, visual, and voice runs are independent, so one provider failure cannot replace a working version or block other outputs.
+On regeneration, Neon links V2 to V1 and Genblaze loads the previous successful result when its manifest is available. Note, workflow, and voice runs are independent, so one provider failure cannot replace a working version or block other outputs.
 
 ## Providers and models
 
@@ -146,7 +147,7 @@ The defaults below come directly from `backend/app/core/config.py` and can be ov
 | --- | --- |
 | Cross-resource analysis and note regeneration | `gemini-2.5-flash` |
 | Voice generation | `gemini-2.5-flash-preview-tts` with the `Kore` prebuilt voice |
-| Visual generation attempt | `gemini-3.1-flash-image` |
+| Learning Workflow | Source-derived workflow builder tracked through Genblaze |
 | Gemini SDK | Official `google-genai` Python SDK |
 | Media orchestration and manifests | `genblaze-core` |
 | B2 storage adapter | `genblaze-s3` Backblaze backend |
@@ -274,7 +275,7 @@ Backend variables belong in `backend/.env`. The browser-visible API URL belongs 
 
 | Variable | Required | Secret | Purpose |
 | --- | --- | --- | --- |
-| `GEMINI_API_KEY` | For analysis/media | Yes | Gemini knowledge reduction, evaluation, note regeneration, TTS, and image generation |
+| `GEMINI_API_KEY` | For analysis/media | Yes | Gemini knowledge reduction, evaluation, note regeneration, and TTS |
 | `YOUTUBE_API_KEY` | For YouTube intake | Yes | Public YouTube metadata through Data API v3 |
 | `DATABASE_URL` | Yes | Yes | Neon PostgreSQL connection string |
 | `B2_APPLICATION_KEY_ID` | Yes | Yes | Scoped Backblaze application-key ID |
@@ -291,7 +292,6 @@ Optional model overrides:
 | Variable | Default |
 | --- | --- |
 | `GEMINI_MODEL` | `gemini-2.5-flash` |
-| `GEMINI_IMAGE_MODEL` | `gemini-3.1-flash-image` |
 | `GEMINI_TTS_MODEL` | `gemini-2.5-flash-preview-tts` |
 | `GEMINI_VOICE_NAME` | `Kore` |
 
@@ -314,16 +314,17 @@ Latest verified results:
 
 | Check | Result |
 | --- | --- |
-| Backend suite | 34 tests passed |
+| Backend suite | 35 tests passed |
 | Frontend TypeScript | Passed |
 | Output-selection tests | 3 passed, including all seven choices and persistence |
 | Focused ESLint on stabilization files | Passed |
 | Real Action Pack | Completed from three ready/approved resources |
+| Learning Workflow | Seven dynamic stages; guided V1 and concise V2 stored in B2 |
 | Voice generation | Valid WAV; V1 and V2 stored and restorable |
-| Version comparison and restore | Passed; V2 restored as current |
-| B2/Neon/Genblaze consistency | Three stored versions matched payload hashes, manifest versions, and run IDs |
+| Version comparison and restore | Workflow and voice history passed; V2 restored as current |
+| B2/Neon/Genblaze consistency | Stored payload hashes, manifest versions, and run IDs matched |
 | Individual download | Passed |
-| Combined ZIP | Passed with successful assets and `provenance.json`; failed visual excluded |
+| Combined ZIP | Includes Action Pack, Voice V2, Learning Workflow V2, and `provenance.json` |
 | Tracked-file secret scan | No Google API key, credentialed database URL, or assigned B2/API secret found |
 
 The full-project ESLint command did not finish within the stabilization pass's five-minute environment-debugging limit, so this README does not claim a complete lint-suite result.
@@ -331,7 +332,6 @@ The full-project ESLint command did not finish within the stabilization pass's f
 ## Known limitations
 
 - YouTube spoken content requires a supplied transcript; metadata-only videos remain `partial`.
-- Gemini image generation is quota-blocked by the configured project's current `429 RESOURCE_EXHAUSTED` response.
 - Media generation currently completes synchronously within the API request.
 - OCR and mixed-language analysis are best-effort.
 - Authentication is outside the hackathon build.

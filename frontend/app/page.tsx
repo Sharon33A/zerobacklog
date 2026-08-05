@@ -139,7 +139,7 @@ export default function Home() {
                 </li>
                 <li>
                   <span className="asset-icon">D</span>
-                  Visual map
+                  Learning workflow
                   <span>Generated on request</span>
                 </li>
                 <li>
@@ -198,7 +198,8 @@ export default function Home() {
           </div>
           <p className="pipeline-note">
             Validation, extraction, evidence-backed Action Packs, generated
-            visual and voice assets, version history, and downloads are implemented.
+            learning workflows, voice assets, version history, and downloads are
+            implemented.
           </p>
         </section>
       </main>

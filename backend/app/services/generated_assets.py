@@ -11,7 +11,7 @@ import time
 import wave
 import zipfile
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Callable, Literal
 from uuid import UUID, uuid4
 
 from genblaze_core.models.asset import Asset
@@ -33,7 +33,11 @@ from app.integrations.knowledge_database import (
     GeneratedAssetRecord,
     KnowledgeDatabase,
 )
-from app.models.action_pack import ActionPackCreateRequest, ActionPackResponse
+from app.models.action_pack import (
+    ActionPackCreateRequest,
+    ActionPackResponse,
+    normalize_output_options,
+)
 from app.models.generated_asset import (
     AssetListResponse,
     AssetProvenance,
@@ -48,7 +52,7 @@ from app.services.errors import InfrastructureError, ResourceActionError
 GENERATION_PROVIDER = "google-gemini-via-genblaze"
 TEXT_PROVIDER = "zerobacklog-via-genblaze"
 TEXT_MODEL = "zerobacklog-grounded-v1"
-ASSET_PROMPT_VERSION = "generated-assets-v1"
+ASSET_PROMPT_VERSION = "generated-assets-v2"
 SAFE_NAME = re.compile(r"[^a-zA-Z0-9._-]+")
 
 
@@ -59,8 +63,35 @@ class AssetEvaluation(BaseModel):
     summary: str = Field(min_length=1, max_length=300)
 
 
+class LearningWorkflowStage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stage_id: str
+    label: str
+    headline: str
+    summary: str
+    tone: Literal["teal", "blue", "violet", "amber", "coral", "green", "navy"]
+    items: list[str] = Field(min_length=1)
+    evidence: list[dict]
+    estimated_minutes: int | None = Field(default=None, ge=0)
+
+
+class LearningWorkflowAsset(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    action_pack_id: UUID
+    project_id: UUID
+    title: str
+    summary: str
+    mode: Literal["guided", "concise"]
+    focus_topics: list[str]
+    source_ids: list[UUID]
+    stages: list[LearningWorkflowStage] = Field(min_length=1)
+
+
 class GoogleMediaGateway:
-    """Official Gemini SDK adapter for image, TTS, and semantic evaluation."""
+    """Official Gemini SDK adapter for TTS and semantic evaluation."""
 
     def __init__(self, settings: Settings, client=None) -> None:
         if settings.gemini_api_key is None:
@@ -72,20 +103,6 @@ class GoogleMediaGateway:
         self._client = client or genai.Client(
             api_key=settings.gemini_api_key.get_secret_value()
         )
-
-    def generate_image(self, prompt: str) -> tuple[bytes, str]:
-        response = self._retry(
-            lambda: self._client.models.generate_content(
-                model=self._settings.gemini_image_model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE"],
-                    image_config=types.ImageConfig(aspect_ratio="16:9"),
-                ),
-            ),
-            "gemini_visual_generation",
-        )
-        return _inline_media(response, "image/")
 
     def generate_voice(self, transcript: str) -> tuple[bytes, str]:
         response = self._retry(
@@ -185,17 +202,6 @@ class GoogleMediaGateway:
         except InfrastructureError:
             raise
         except Exception as exception:
-            if _is_quota_error(exception):
-                medium = (
-                    "image"
-                    if operation_name == "gemini_visual_generation"
-                    else "media"
-                )
-                raise InfrastructureError(
-                    "media_quota_exhausted",
-                    f"Gemini returned 429 RESOURCE_EXHAUSTED: {medium}-generation "
-                    "quota is unavailable for the configured project.",
-                ) from exception
             raise InfrastructureError(
                 "media_generation_failed",
                 "The selected media could not be generated.",
@@ -210,7 +216,7 @@ class GoogleMediaGateway:
 class _StoredOutputProvider(SyncProvider):
     """Genblaze provider that generates bytes and stores the output in B2."""
 
-    name = "zerobacklog-google-media"
+    name = "zerobacklog-learning-asset"
 
     def __init__(
         self,
@@ -301,22 +307,24 @@ class GeneratedAssetService:
                         [item.model_dump(mode="json") for item in note.evidence],
                     )
                 )
-        visual_topics = request.visual_topics or [pack.start_here.topic_or_resource]
-        if "visual_mind_map" in request.output_options:
-            for topic in visual_topics:
-                facts, evidence = _topic_facts(pack, topic)
-                prompt = _visual_prompt(topic, facts)
-                tasks.append(
-                    (
-                        "visual",
-                        f"visual-{_slug(topic)}",
-                        f"Visual — {topic}",
-                        "image/png",
-                        self._settings.gemini_image_model,
-                        self._get_gateway().generate_image,
-                        evidence,
-                    )
+        if "learning_workflow" in request.output_options:
+            workflow = _build_learning_workflow(
+                response,
+                focus_topics=request.workflow_focus_topics,
+                mode="guided",
+            )
+            payload = workflow.model_dump_json(indent=2).encode("utf-8")
+            tasks.append(
+                (
+                    "learning_workflow",
+                    "learning-workflow",
+                    "Learning Workflow",
+                    "application/json",
+                    TEXT_MODEL,
+                    lambda _prompt, value=payload: (value, "application/json"),
+                    all_evidence,
                 )
+            )
         if "voice_lesson" in request.output_options:
             transcript = _voice_transcript(
                 pack,
@@ -396,18 +404,10 @@ class GeneratedAssetService:
             evidence,
         ) in tasks:
             prompt = (
-                _visual_prompt(display_name, [])
-                if asset_type == "visual"
-                else (
-                    transcript
-                    if asset_type == "voice"
-                    else f"Create {display_name} from the validated Action Pack."
-                )
+                transcript
+                if asset_type == "voice"
+                else f"Create {display_name} from the validated Action Pack."
             )
-            if asset_type == "visual":
-                topic = display_name.removeprefix("Visual — ")
-                facts, _ = _topic_facts(pack, topic)
-                prompt = _visual_prompt(topic, facts)
             settings = {
                 "prompt_version": ASSET_PROMPT_VERSION,
                 "voice_mode": request.voice_mode if asset_type == "voice" else None,
@@ -416,7 +416,14 @@ class GeneratedAssetService:
                     if request.learner_profile
                     else None
                 ),
-                "visual_style": "mind_map" if asset_type == "visual" else None,
+                "workflow_mode": (
+                    "guided" if asset_type == "learning_workflow" else None
+                ),
+                "workflow_focus_topics": (
+                    request.workflow_focus_topics
+                    if asset_type == "learning_workflow"
+                    else None
+                ),
             }
             try:
                 await self._generate_version(
@@ -431,9 +438,7 @@ class GeneratedAssetService:
                     evidence=evidence,
                     generation_settings=settings,
                     classification=(
-                        "ai_generated"
-                        if asset_type in {"visual", "voice"}
-                        else "source_derived"
+                        "ai_generated" if asset_type == "voice" else "source_derived"
                     ),
                 )
             except Exception:
@@ -449,10 +454,11 @@ class GeneratedAssetService:
         asset, versions = await asyncio.to_thread(
             self._knowledge_database.get_asset, asset_id
         )
-        if asset.asset_type not in {"note", "visual", "voice"}:
+        if asset.asset_type not in {"note", "learning_workflow", "voice"}:
             raise ResourceActionError(
                 "asset_not_regenerable",
-                "Only an individual note, visual, or voice lesson can be regenerated.",
+                "Only an individual note, learning workflow, or voice lesson can "
+                "be regenerated.",
             )
         pack_record = await asyncio.to_thread(
             self._knowledge_database.get_action_pack,
@@ -491,15 +497,32 @@ class GeneratedAssetService:
             generator = self._get_gateway().regenerate_note
             model = self._settings.gemini_model
             mime_type = "text/markdown"
-        elif asset.asset_type == "visual":
-            topic = asset.display_name.removeprefix("Visual — ")
-            facts, evidence = _topic_facts(pack, topic)
-            style = request.visual_style or "mind_map"
-            settings["visual_style"] = style
-            prompt = _visual_prompt(topic, facts, style=style)
-            generator = self._get_gateway().generate_image
-            model = self._settings.gemini_image_model
-            mime_type = "image/png"
+        elif asset.asset_type == "learning_workflow":
+            mode = request.workflow_mode or settings.get("workflow_mode") or "guided"
+            focus_topics = [
+                str(topic)
+                for topic in settings.get("workflow_focus_topics", [])
+                if str(topic).strip()
+            ][:3]
+            settings["workflow_mode"] = mode
+            settings["workflow_focus_topics"] = focus_topics
+            workflow = _build_learning_workflow(
+                response,
+                focus_topics=focus_topics,
+                mode=mode,
+            )
+            payload = workflow.model_dump_json(indent=2).encode("utf-8")
+            prompt = (
+                f"Rebuild the {mode} Learning Workflow from Action Pack "
+                f"{response.id}."
+            )
+            generator = lambda _prompt, value=payload: (
+                value,
+                "application/json",
+            )
+            model = TEXT_MODEL
+            mime_type = "application/json"
+            evidence = _all_pack_evidence(pack.model_dump(mode="json"))
         else:
             mode = request.voice_mode or settings.get("voice_mode") or "normal"
             settings["voice_mode"] = mode
@@ -524,7 +547,11 @@ class GeneratedAssetService:
                 generator=generator,
                 evidence=evidence,
                 generation_settings=settings,
-                classification="ai_generated",
+                classification=(
+                    "ai_generated"
+                    if asset.asset_type in {"note", "voice"}
+                    else "source_derived"
+                ),
             )
         except Exception:
             # Return the failed version in history without moving the current
@@ -614,11 +641,7 @@ class GeneratedAssetService:
                 model=model,
                 prompt=prompt,
                 modality=(
-                    Modality.IMAGE
-                    if asset_type == "visual"
-                    else Modality.AUDIO
-                    if asset_type == "voice"
-                    else Modality.TEXT
+                    Modality.AUDIO if asset_type == "voice" else Modality.TEXT
                 ),
                 asset_type=asset_type,
                 version_number=version.version_number,
@@ -637,16 +660,17 @@ class GeneratedAssetService:
                 )
             data = provider.output_data
             actual_mime = provider.output_mime_type
-            evaluation = (
-                await asyncio.to_thread(
+            if asset_type == "voice":
+                evaluation = await asyncio.to_thread(
                     self._get_gateway().evaluate,
                     data,
                     actual_mime,
                     prompt[:1500],
                 )
-                if asset_type in {"visual", "voice"}
-                else _technical_evaluation(data, actual_mime)
-            )
+            elif asset_type == "learning_workflow":
+                evaluation = _workflow_evaluation(data, actual_mime)
+            else:
+                evaluation = _technical_evaluation(data, actual_mime)
             manifest_payload = result.manifest.model_dump_json(
                 indent=2
             ).encode("utf-8")
@@ -904,16 +928,10 @@ def _inline_media(response, mime_prefix: str) -> tuple[bytes, str]:
 
 def _is_retriable_google_error(error: Exception) -> bool:
     status_code = getattr(error, "status_code", None) or getattr(error, "code", None)
-    return status_code in {408, 500, 502, 503, 504} or any(
+    return status_code in {408, 429, 500, 502, 503, 504} or any(
         token in type(error).__name__.lower()
         for token in ("timeout", "connection", "server")
     )
-
-
-def _is_quota_error(error: Exception) -> bool:
-    status_code = getattr(error, "status_code", None) or getattr(error, "code", None)
-    message = str(error).upper()
-    return status_code == 429 or "RESOURCE_EXHAUSTED" in message
 
 
 def _safe_generation_failure(error: Exception, asset_type: str) -> str:
@@ -921,22 +939,17 @@ def _safe_generation_failure(error: Exception, asset_type: str) -> str:
     while current is not None:
         if isinstance(current, InfrastructureError):
             return current.message
-        if _is_quota_error(current):
-            medium = "image" if asset_type == "visual" else "media"
-            return (
-                f"Gemini returned 429 RESOURCE_EXHAUSTED: {medium}-generation "
-                "quota is unavailable for the configured project."
-            )
         current = current.__cause__
-    return "Generation failed before a verified asset was stored."
+    return (
+        f"{asset_type.replace('_', ' ').title()} generation failed before a "
+        "verified asset was stored."
+    )
 
 
 def _technical_evaluation(data: bytes, mime_type: str) -> AssetEvaluation:
     if not data:
         return AssetEvaluation(confidence=0, summary="The generated output was empty.")
-    if mime_type.startswith("image/"):
-        valid = len(data) > 20_000
-    elif mime_type.startswith("audio/"):
+    if mime_type.startswith("audio/"):
         valid = len(data) > 12_000
     else:
         valid = len(data) > 100
@@ -996,41 +1009,236 @@ def _render_note(note: dict) -> str:
     return "\n".join(lines)
 
 
-def _topic_facts(pack, topic: str) -> tuple[list[str], list[dict]]:
-    normalized = topic.casefold()
-    for note in pack.merged_notes:
-        if normalized in note.topic.casefold() or note.topic.casefold() in normalized:
-            return (
-                note.concise_notes[:6],
-                [item.model_dump(mode="json") for item in note.evidence],
+def _build_learning_workflow(
+    response: ActionPackResponse,
+    *,
+    focus_topics: list[str],
+    mode: Literal["guided", "concise"],
+) -> LearningWorkflowAsset:
+    """Derive a learner-facing roadmap from the validated Action Pack."""
+    pack = response.action_pack
+    item_limit = 3 if mode == "concise" else 6
+    normalized_focus = [topic.strip() for topic in focus_topics if topic.strip()][:3]
+
+    common_topics = list(pack.common_topics)
+    if normalized_focus:
+        common_topics.sort(
+            key=lambda item: not any(
+                focus.casefold() in item.topic.casefold()
+                or item.topic.casefold() in focus.casefold()
+                for focus in normalized_focus
             )
-    facts = [
-        pack.start_here.why,
-        *[
-            item.explanation
-            for item in pack.common_topics
-            if normalized in item.topic.casefold() or item.topic.casefold() in normalized
-        ],
+        )
+
+    core_items = [
+        f"{topic.topic}: {topic.explanation}" for topic in common_topics[:item_limit]
+    ] or [f"Build the foundation for {pack.start_here.topic_or_resource}."]
+    core_evidence = [
+        evidence.model_dump(mode="json")
+        for topic in common_topics[:item_limit]
+        for evidence in topic.evidence
     ]
-    return facts[:6], [
+
+    mistake_items = [
+        f"{note.topic}: {mistake}"
+        for note in pack.merged_notes
+        for mistake in note.common_mistakes
+    ][:item_limit]
+    if not mistake_items:
+        mistake_items = [
+            f"{note.topic}: watch for the recognition clues before choosing a pattern."
+            for note in pack.merged_notes[:item_limit]
+        ] or ["Check assumptions before committing to an approach."]
+    mistake_evidence = [
+        evidence.model_dump(mode="json")
+        for note in pack.merged_notes[:item_limit]
+        for evidence in note.evidence
+    ]
+
+    priority_order = {"must_do": 0, "useful": 1, "optional": 2}
+    priority_problems = sorted(
+        pack.priority_problems,
+        key=lambda item: priority_order[item.priority],
+    )
+    problem_items = [
+        (
+            f"{problem.priority.replace('_', ' ').title()}: "
+            f"{problem.normalized_name} — {problem.reason}"
+        )
+        for problem in priority_problems[:item_limit]
+    ] or ["Apply the core concepts to one representative problem."]
+    problem_evidence = [
+        evidence.model_dump(mode="json")
+        for problem in priority_problems[:item_limit]
+        for evidence in problem.evidence
+    ]
+
+    essential = pack.backlog_reduction.essential_resources
+    practice_items = [
+        f"Study {resource.title}: {resource.reason}"
+        for resource in essential[: max(1, item_limit // 2)]
+    ]
+    practice_items.extend(
+        f"Then solve {problem.normalized_name}."
+        for problem in priority_problems[: max(1, item_limit // 2)]
+    )
+    practice_items = practice_items[:item_limit] or [
+        f"Begin with {pack.start_here.topic_or_resource}, then practice immediately."
+    ]
+    practice_evidence = [
+        evidence.model_dump(mode="json")
+        for resource in essential
+        for evidence in resource.evidence
+    ] + problem_evidence
+
+    revision_items = [
+        f"{note.topic}: {cue}"
+        for note in pack.merged_notes
+        for cue in note.memory_cues
+    ][:item_limit]
+    revision_items.extend(
+        f"Unique insight: {insight.insight}"
+        for insight in pack.unique_insights[: max(0, item_limit - len(revision_items))]
+    )
+    revision_items = revision_items[:item_limit] or [
+        "Revisit the merged notes and explain each idea without looking."
+    ]
+    revision_evidence = [
+        evidence.model_dump(mode="json")
+        for note in pack.merged_notes
+        for evidence in note.evidence
+    ] + [
+        evidence.model_dump(mode="json")
+        for insight in pack.unique_insights
+        for evidence in insight.evidence
+    ]
+
+    ready_items = [
+        f"Resolve this conflict: {conflict.topic}."
+        for conflict in pack.contradictions[:item_limit]
+    ]
+    ready_items.extend(
+        f"Explain {topic.topic} and when to use it."
+        for topic in common_topics[: max(0, item_limit - len(ready_items))]
+    )
+    ready_items = ready_items[:item_limit] or [
+        f"Teach back {pack.start_here.topic_or_resource} and complete a timed problem."
+    ]
+    ready_evidence = [
+        evidence.model_dump(mode="json")
+        for conflict in pack.contradictions
+        for side in conflict.sides
+        for evidence in side.evidence
+    ] + core_evidence
+
+    start_evidence = [
         item.model_dump(mode="json") for item in pack.start_here.evidence
     ]
+    stages = [
+        LearningWorkflowStage(
+            stage_id="start-here",
+            label="Start Here",
+            headline=pack.start_here.topic_or_resource,
+            summary=pack.start_here.why,
+            tone="teal",
+            items=[
+                f"Use {resource.title}: {resource.reason}"
+                for resource in essential[:item_limit]
+            ]
+            or [pack.start_here.why],
+            evidence=start_evidence,
+            estimated_minutes=pack.start_here.estimated_minutes,
+        ),
+        LearningWorkflowStage(
+            stage_id="core-concepts",
+            label="Core Concepts",
+            headline="Connect the ideas that repeat",
+            summary=f"{len(pack.common_topics)} recurring topic(s) shape the route.",
+            tone="blue",
+            items=core_items,
+            evidence=core_evidence,
+        ),
+        LearningWorkflowStage(
+            stage_id="common-mistakes",
+            label="Common Mistakes",
+            headline="Avoid the errors your sources warn about",
+            summary="Use these checks before choosing or coding an approach.",
+            tone="coral",
+            items=mistake_items,
+            evidence=mistake_evidence,
+        ),
+        LearningWorkflowStage(
+            stage_id="priority-problems",
+            label="Priority Problems",
+            headline="Practice the highest-value problems",
+            summary="Must-do problems come first; useful and optional work follows.",
+            tone="violet",
+            items=problem_items,
+            evidence=problem_evidence,
+        ),
+        LearningWorkflowStage(
+            stage_id="practice-order",
+            label="Practice Order",
+            headline="Turn reading into an ordered session",
+            summary="Move from essential sources into immediate problem practice.",
+            tone="amber",
+            items=practice_items,
+            evidence=practice_evidence,
+        ),
+        LearningWorkflowStage(
+            stage_id="revision",
+            label="Revision",
+            headline="Compress the route into recall cues",
+            summary="Use memory cues and rare insights to revise without rereading.",
+            tone="green",
+            items=revision_items,
+            evidence=revision_evidence,
+        ),
+        LearningWorkflowStage(
+            stage_id="interview-ready",
+            label="Interview Ready",
+            headline="Prove the learning under pressure",
+            summary=pack.executive_summary,
+            tone="navy",
+            items=ready_items,
+            evidence=ready_evidence,
+        ),
+    ]
+    return LearningWorkflowAsset(
+        action_pack_id=response.id,
+        project_id=response.project_id,
+        title=f"{pack.title} — Learning Workflow",
+        summary=pack.executive_summary,
+        mode=mode,
+        focus_topics=normalized_focus,
+        source_ids=response.source_ids,
+        stages=stages,
+    )
 
 
-def _visual_prompt(
-    topic: str,
-    facts: list[str],
-    *,
-    style: str = "mind_map",
-) -> str:
-    fact_text = "\n".join(f"- {fact}" for fact in facts) or "- Use the topic title only."
-    return (
-        f"Create a polished educational {style.replace('_', ' ')} about {topic}. "
-        "Use a calm navy, teal, warm coral, and cream palette. Use a clean 16:9 "
-        "layout with large readable labels, strong hierarchy, arrows only where "
-        "relationships are supported, and no decorative robot or generic AI imagery. "
-        "Include only these verified learning points; do not add facts:\n"
-        f"{fact_text}"
+def _workflow_evaluation(data: bytes, mime_type: str) -> AssetEvaluation:
+    if mime_type != "application/json":
+        return AssetEvaluation(
+            confidence=0.2,
+            summary="The workflow was not returned as structured JSON.",
+        )
+    try:
+        workflow = LearningWorkflowAsset.model_validate_json(data)
+    except Exception:
+        return AssetEvaluation(
+            confidence=0.2,
+            summary="The workflow JSON failed schema validation.",
+        )
+    complete = len(workflow.stages) == 7 and all(
+        stage.headline.strip() and stage.items for stage in workflow.stages
+    )
+    return AssetEvaluation(
+        confidence=0.96 if complete else 0.68,
+        summary=(
+            "Seven Action Pack-derived stages passed workflow validation."
+            if complete
+            else "The workflow is usable but one or more stages are incomplete."
+        ),
     )
 
 
@@ -1161,7 +1369,7 @@ def _response_from_pack_record(record) -> ActionPackResponse:
         source_ids=list(record.source_ids),
         result_object_key=record.result_object_key,
         generated_at=record.updated_at,
-        output_options=list(record.output_options),
+        output_options=normalize_output_options(record.output_options),
         action_pack=ActionPack.model_validate(record.result_json),
     )
 
@@ -1175,8 +1383,6 @@ def _extension_for(mime_type: str) -> str:
     return {
         "application/json": "json",
         "text/markdown": "md",
-        "image/png": "png",
-        "image/jpeg": "jpg",
         "audio/wav": "wav",
         "audio/mpeg": "mp3",
     }.get(mime_type, "bin")

@@ -2,8 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { API_BASE_URL } from "@/lib/config";
+import { LearningWorkflow } from "@/components/learning-workflow";
 import {
   DEFAULT_GENERATION_SETTINGS,
   GENERATION_SETTINGS_KEY,
@@ -26,7 +26,7 @@ const STAGES = [
   "Compare",
   "Decide",
   "Build Action Pack",
-  "Generate selected media",
+  "Generate selected learning assets",
   "Evaluate outputs",
   "Store versions",
 ];
@@ -100,7 +100,7 @@ function GeneratedAssetsPanel({
           const current =
             asset.versions.find((version) => version.is_current) ??
             asset.versions[0];
-          const canRegenerate = ["note", "visual", "voice"].includes(
+          const canRegenerate = ["note", "learning_workflow", "voice"].includes(
             asset.asset_type,
           );
           return (
@@ -126,14 +126,12 @@ function GeneratedAssetsPanel({
                 </strong>
               </header>
 
-              {current?.status === "stored" && asset.asset_type === "visual" && (
-                <Image
-                  className="generated-visual"
-                  src={assetUrl(current.download_url) ?? ""}
-                  alt={`${asset.display_name}, AI-generated learning visual`}
-                  width={1344}
-                  height={768}
-                  unoptimized
+              {current?.status === "stored" &&
+                asset.asset_type === "learning_workflow" &&
+                current.download_url && (
+                <LearningWorkflow
+                  downloadUrl={assetUrl(current.download_url) ?? ""}
+                  version={current.version_number}
                 />
               )}
               {current?.status === "stored" && asset.asset_type === "voice" && (
@@ -147,16 +145,10 @@ function GeneratedAssetsPanel({
               )}
               {current?.status === "failed" && (
                 <div className="asset-failure" role="status">
-                  <strong>
-                    {asset.asset_type === "visual"
-                      ? "Visual unavailable — your pack is still ready"
-                      : "Generation failed"}
-                  </strong>
+                  <strong>Generation failed</strong>
                   <p>
-                    {asset.asset_type === "visual"
-                      ? "Gemini could not create a verified image. Notes, voice, versions, provenance, and downloads remain available."
-                      : current.failure_message ||
-                        "No verified media was stored for this version."}
+                    {current.failure_message ||
+                      "No verified learning asset was stored for this version."}
                   </p>
                   {current.failure_message && (
                     <details>
@@ -238,7 +230,11 @@ function GeneratedAssetsPanel({
 
               <div className="asset-actions">
                 {current?.download_url && (
-                  <a href={assetUrl(current.download_url)}>Download this version</a>
+                  <a href={assetUrl(current.download_url)}>
+                    {asset.asset_type === "learning_workflow"
+                      ? "Download workflow JSON"
+                      : "Download this version"}
+                  </a>
                 )}
                 {canRegenerate && (
                   <button
@@ -248,7 +244,9 @@ function GeneratedAssetsPanel({
                   >
                     {activeAsset === asset.id
                       ? "Generating..."
-                      : `Regenerate only this ${asset.asset_type}`}
+                      : asset.asset_type === "learning_workflow"
+                        ? "Regenerate only this workflow"
+                        : `Regenerate only this ${asset.asset_type}`}
                   </button>
                 )}
                 {asset.versions.length > 1 && (
@@ -418,7 +416,8 @@ export function ActionPackResults({ projectId }: { projectId: string }) {
           body: JSON.stringify({
             learner_profile: generationSettings.learner_profile,
             output_options: generationSettings.output_options,
-            visual_topics: generationSettings.visual_topics,
+            workflow_focus_topics:
+              generationSettings.workflow_focus_topics,
             voice_mode: generationSettings.voice_mode,
           }),
         },
@@ -464,8 +463,13 @@ export function ActionPackResults({ projectId }: { projectId: string }) {
               asset.asset_type === "voice"
                 ? generationSettings.voice_mode
                 : null,
-            visual_style:
-              asset.asset_type === "visual" ? "mind_map" : null,
+            workflow_mode:
+              asset.asset_type === "learning_workflow"
+                ? asset.versions.find((version) => version.is_current)
+                    ?.generation_settings.workflow_mode === "concise"
+                  ? "guided"
+                  : "concise"
+                : null,
           }),
         },
       );

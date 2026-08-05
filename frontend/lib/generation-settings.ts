@@ -13,7 +13,7 @@ export interface LearnerProfileSettings {
 export interface GenerationSettings {
   learner_profile: LearnerProfileSettings | null;
   output_options: OutputOption[];
-  visual_topics: string[];
+  workflow_focus_topics: string[];
   voice_mode: "normal" | "quick_revision";
 }
 
@@ -25,7 +25,7 @@ export const OUTPUT_OPTIONS: ReadonlyArray<{
 }> = [
   { value: "complete_action_pack", label: "Complete Action Pack" },
   { value: "quick_revision_notes", label: "Quick Revision Notes" },
-  { value: "visual_mind_map", label: "Visual Mind Map" },
+  { value: "learning_workflow", label: "Learning Workflow" },
   { value: "voice_lesson", label: "Voice Lesson" },
   { value: "flashcards", label: "Flashcards" },
   { value: "priority_coding_problems", label: "Priority Coding Problems" },
@@ -34,14 +34,14 @@ export const OUTPUT_OPTIONS: ReadonlyArray<{
 
 export const DEFAULT_OUTPUT_OPTIONS: OutputOption[] = [
   "complete_action_pack",
-  "visual_mind_map",
+  "learning_workflow",
   "voice_lesson",
 ];
 
 export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
   learner_profile: null,
   output_options: DEFAULT_OUTPUT_OPTIONS,
-  visual_topics: [],
+  workflow_focus_topics: [],
   voice_mode: "normal",
 };
 
@@ -62,19 +62,26 @@ export function parseGenerationSettings(raw: string | null): GenerationSettings 
   if (!raw) return { ...DEFAULT_GENERATION_SETTINGS };
   try {
     const parsed = JSON.parse(raw) as Partial<GenerationSettings>;
-    const outputOptions = Array.isArray(parsed.output_options)
-      ? parsed.output_options.filter(
-          (option): option is OutputOption =>
-            typeof option === "string" &&
-            VALID_OUTPUTS.has(option as OutputOption),
-        )
+    const submittedOutputs = Array.isArray(parsed.output_options)
+      ? parsed.output_options
       : [];
+    const outputOptions = submittedOutputs.filter(
+      (option): option is OutputOption =>
+        typeof option === "string" &&
+        VALID_OUTPUTS.has(option as OutputOption),
+    );
+    if (
+      outputOptions.length !== submittedOutputs.length &&
+      !outputOptions.includes("learning_workflow")
+    ) {
+      outputOptions.push("learning_workflow");
+    }
     return {
       learner_profile: parsed.learner_profile ?? null,
       output_options:
         outputOptions.length > 0 ? outputOptions : [...DEFAULT_OUTPUT_OPTIONS],
-      visual_topics: Array.isArray(parsed.visual_topics)
-        ? parsed.visual_topics.filter(
+      workflow_focus_topics: Array.isArray(parsed.workflow_focus_topics)
+        ? parsed.workflow_focus_topics.filter(
             (topic): topic is string => typeof topic === "string",
           )
         : [],

@@ -85,7 +85,7 @@ export interface ActionPack {
 export type OutputOption =
   | "complete_action_pack"
   | "quick_revision_notes"
-  | "visual_mind_map"
+  | "learning_workflow"
   | "voice_lesson"
   | "flashcards"
   | "priority_coding_problems"
@@ -133,7 +133,7 @@ export interface GeneratedAsset {
   asset_type:
     | "complete_action_pack"
     | "note"
-    | "visual"
+    | "learning_workflow"
     | "voice"
     | "flashcards"
     | "priority_problems"
@@ -144,6 +144,29 @@ export interface GeneratedAsset {
   created_at: string;
   updated_at: string;
   versions: GeneratedAssetVersion[];
+}
+
+export interface LearningWorkflowStage {
+  stage_id: string;
+  label: string;
+  headline: string;
+  summary: string;
+  tone: "teal" | "blue" | "violet" | "amber" | "coral" | "green" | "navy";
+  items: string[];
+  evidence: Array<Record<string, unknown>>;
+  estimated_minutes: number | null;
+}
+
+export interface LearningWorkflowAsset {
+  schema_version: 1;
+  action_pack_id: string;
+  project_id: string;
+  title: string;
+  summary: string;
+  mode: "guided" | "concise";
+  focus_topics: string[];
+  source_ids: string[];
+  stages: LearningWorkflowStage[];
 }
 
 export interface ActionPackResponse {

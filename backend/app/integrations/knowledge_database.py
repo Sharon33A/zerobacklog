@@ -231,7 +231,8 @@ class KnowledgeDatabase:
                                 project_id UUID NOT NULL,
                                 asset_type TEXT NOT NULL CHECK (
                                     asset_type IN (
-                                        'complete_action_pack', 'note', 'visual',
+                                        'complete_action_pack', 'note',
+                                        'learning_workflow',
                                         'voice', 'flashcards', 'priority_problems',
                                         'interview_revision_sheet'
                                     )
@@ -243,6 +244,27 @@ class KnowledgeDatabase:
                                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                                 UNIQUE (action_pack_id, asset_type, logical_key)
                             )
+                            """
+                        )
+                        cursor.execute(
+                            """
+                            ALTER TABLE generated_assets
+                            DROP CONSTRAINT IF EXISTS
+                            generated_assets_asset_type_check
+                            """
+                        )
+                        cursor.execute(
+                            """
+                            ALTER TABLE generated_assets
+                            ADD CONSTRAINT generated_assets_asset_type_check
+                            CHECK (
+                                asset_type IN (
+                                    'complete_action_pack', 'note',
+                                    'learning_workflow', 'voice', 'flashcards',
+                                    'priority_problems',
+                                    'interview_revision_sheet'
+                                )
+                            ) NOT VALID
                             """
                         )
                         cursor.execute(
@@ -980,6 +1002,11 @@ class KnowledgeDatabase:
                         """
                         SELECT * FROM generated_assets
                         WHERE action_pack_id = %s
+                          AND asset_type IN (
+                              'complete_action_pack', 'note',
+                              'learning_workflow', 'voice', 'flashcards',
+                              'priority_problems', 'interview_revision_sheet'
+                          )
                         ORDER BY created_at, display_name
                         """,
                         (action_pack_id,),

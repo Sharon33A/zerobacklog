@@ -42,7 +42,7 @@ Target runtime: **2 minutes 55 seconds**, leaving a small editing margin below t
 
 ### 1:23–1:48 — Generated text, image, and voice assets
 
-**Visual:** The learning path becomes concise notes, a useful visual map, and a short playable voice lesson.
+**Visual:** The learning path becomes concise notes, an expandable Learning Workflow, and a short playable voice lesson.
 
 **Narration:** “Genblaze orchestrates only the assets this learner needs. Each brief is tied to the selected evidence and each output has an evaluation state.”
 
@@ -50,15 +50,15 @@ Target runtime: **2 minutes 55 seconds**, leaving a small editing margin below t
 
 ### 1:48–2:08 — Selective regeneration
 
-**Visual:** Mark the visual asset as unclear or show an evaluator warning; regenerate only that asset.
+**Visual:** Switch the Learning Workflow from guided to concise mode and regenerate only that asset.
 
 **Narration:** “A weak result does not restart the project. ZeroBacklog retries the smallest failed unit, preserves successful media, and records a new version.”
 
-**Evidence:** Other asset timestamps remain unchanged; the visual moves from version 1 to version 2.
+**Evidence:** Other asset timestamps remain unchanged; the workflow moves from version 1 to version 2.
 
 ### 2:08–2:30 — B2 storage and provenance
 
-**Visual:** Compact provenance panel plus a brief B2 object view containing original, generated assets, evaluation/manifest data, and the new visual version.
+**Visual:** Compact provenance panel plus a brief B2 object view containing originals, generated assets, manifest data, and the new workflow version.
 
 **Narration:** “Backblaze B2 is the durable artifact layer. Originals, derivatives, evaluations, and versions remain connected, so the learner can trust where the pack came from.”
 

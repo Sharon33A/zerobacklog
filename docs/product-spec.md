@@ -45,7 +45,7 @@ The intended MVP vertical slice includes:
 - cross-resource concept grouping and repetition reduction;
 - evidence-linked consume, skim, practice, and skip decisions;
 - a prioritized learning sequence;
-- generated concise text notes, one useful visual format, and a voice lesson;
+- generated concise text notes, an interactive Learning Workflow, and a voice lesson;
 - evaluation state for each generated asset;
 - selective regeneration of one asset;
 - storage of originals and derivatives in Backblaze B2;
@@ -84,7 +84,7 @@ The result experience should lead with action, then evidence:
 5. **Skip list** — items or sections that add little value, with evidence and confidence.
 6. **Practice plan** — de-duplicated coding problems grouped by pattern.
 7. **Concise notes** — source-linked written synthesis.
-8. **Visual asset** — a diagram, flowchart, or revision image selected for the topic.
+8. **Learning Workflow** — an expandable roadmap from the first topic through practice and revision.
 9. **Voice lesson** — a short audio review for a bounded learning objective.
 10. **Revision cards** — compact recall prompts tied to the learning path.
 11. **Processing report** — supported, partial, failed, and excluded resources.
@@ -178,7 +178,7 @@ These are proposed MVP/demo targets, not current measurements.
 - Which exact input types make the strongest feasible vertical slice?
 - How should learners express goal, time budget, and prior knowledge without a long form?
 - What evidence threshold is required for a safe skip recommendation?
-- Which visual output is most useful for the demo topic: concept map, flowchart, or comparison diagram?
+- Which workflow stages give the learner the clearest route from study to practice?
 - When should the learner approve generation to control latency and cost?
 - What should remain in a downloadable pack when a source is partial or low confidence?
 - How should retention and project deletion be explained in plain language?

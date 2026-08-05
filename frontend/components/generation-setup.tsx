@@ -43,7 +43,7 @@ export function GenerationSetup() {
       setDate(profile.target_interview_date || "");
     }
     setOutputs(saved.output_options);
-    setTopics(saved.visual_topics.join(", "));
+    setTopics(saved.workflow_focus_topics.join(", "));
     setVoiceMode(saved.voice_mode);
   }, []);
 
@@ -67,7 +67,7 @@ export function GenerationSetup() {
       JSON.stringify({
         learner_profile: hasProfile ? learnerProfile : null,
         output_options: outputs,
-        visual_topics: topics
+        workflow_focus_topics: topics
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean)
@@ -176,13 +176,13 @@ export function GenerationSetup() {
             </label>
           ))}
         </div>
-        {outputs.includes("visual_mind_map") && (
+        {outputs.includes("learning_workflow") && (
           <label className="setup-wide-field">
-            Visual topics (up to three)
+            Workflow focus topics (up to three)
             <input
               value={topics}
               onChange={(event) => setTopics(event.target.value)}
-              placeholder="Leave blank to visualize the Start Here topic"
+              placeholder="Leave blank to follow the full Action Pack"
             />
           </label>
         )}

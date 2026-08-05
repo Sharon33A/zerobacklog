@@ -117,7 +117,7 @@ Genblaze is planned to turn an evidence-linked learning decision into selected m
 
 - Show one analysis decision becoming a generation brief.
 - Show Genblaze orchestrating genuinely different media types.
-- Display generated text, a useful learning visual, and playable voice output.
+- Display generated text, an interactive Learning Workflow, and playable voice output.
 - Show an evaluation status for each asset.
 - Reject or flag one asset, selectively regenerate it, and keep the other outputs unchanged.
 - Show the regenerated version stored in B2 and selected into the Action Pack.

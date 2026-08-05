@@ -3,7 +3,7 @@ const FLOW_STEPS = [
   "Files + links",
   "Resource readiness",
   "Action Pack",
-  "Visual + voice",
+  "Workflow + voice",
   "Versions + downloads",
 ];
 

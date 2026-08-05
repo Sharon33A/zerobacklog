@@ -17,7 +17,7 @@ test("Quick Revision Notes can be selected and deselected independently", () => 
   );
 
   assert.equal(selected.includes("quick_revision_notes"), true);
-  assert.equal(selected.includes("visual_mind_map"), true);
+  assert.equal(selected.includes("learning_workflow"), true);
   assert.equal(selected.includes("voice_lesson"), true);
 
   const deselected = toggleOutputOption(
@@ -26,7 +26,7 @@ test("Quick Revision Notes can be selected and deselected independently", () => 
     false,
   );
   assert.equal(deselected.includes("quick_revision_notes"), false);
-  assert.equal(deselected.includes("visual_mind_map"), true);
+  assert.equal(deselected.includes("learning_workflow"), true);
 });
 
 test("all seven outputs support independent multi-selection without duplicates", () => {
@@ -64,7 +64,7 @@ test("saved multi-output choices parse without resetting to defaults", () => {
         "flashcards",
         "interview_revision_sheet",
       ],
-      visual_topics: [],
+      workflow_focus_topics: [],
       voice_mode: "normal",
     }),
   );

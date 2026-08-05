@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Iterable, Literal, get_args
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,12 +13,25 @@ from app.models.generated_asset import GeneratedAsset
 OutputOption = Literal[
     "complete_action_pack",
     "quick_revision_notes",
-    "visual_mind_map",
+    "learning_workflow",
     "voice_lesson",
     "flashcards",
     "priority_coding_problems",
     "interview_revision_sheet",
 ]
+
+VALID_OUTPUT_OPTIONS = frozenset(get_args(OutputOption))
+
+
+def normalize_output_options(values: Iterable[str]) -> list[OutputOption]:
+    """Keep stored output selections compatible with the current contract."""
+    submitted = list(values)
+    normalized = [
+        value for value in submitted if value in VALID_OUTPUT_OPTIONS
+    ]
+    if len(normalized) != len(submitted) and "learning_workflow" not in normalized:
+        normalized.append("learning_workflow")
+    return normalized or ["complete_action_pack"]
 
 
 class EvidenceReference(BaseModel):
@@ -176,7 +189,7 @@ class ActionPackCreateRequest(BaseModel):
         min_length=1,
         max_length=7,
     )
-    visual_topics: list[str] = Field(default_factory=list, max_length=3)
+    workflow_focus_topics: list[str] = Field(default_factory=list, max_length=3)
     voice_mode: Literal["normal", "quick_revision"] = "normal"
 
 

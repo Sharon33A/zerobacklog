@@ -1,18 +1,23 @@
 """Focused URL-intake and evidence-first Action Pack tests."""
 
 import json
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 
-from app.models.action_pack import ActionPack
+from app.models.action_pack import ActionPack, ActionPackResponse
 from app.services.action_packs import (
     SourceDocument,
     parse_gemini_response,
     validate_action_pack,
 )
 from app.services.errors import InfrastructureError, UrlValidationError
+from app.services.generated_assets import (
+    _build_learning_workflow,
+    _workflow_evaluation,
+)
 from app.services.link_intake import (
     parse_iso_duration,
     retrieve_link,
@@ -167,6 +172,38 @@ def test_gemini_output_parsing_with_mock_response() -> None:
 
     assert isinstance(parsed, ActionPack)
     assert parsed.start_here.topic_or_resource == "Arrays"
+
+
+def test_learning_workflow_is_derived_from_the_action_pack() -> None:
+    first_id, second_id = uuid4(), uuid4()
+    pack = ActionPack.model_validate(_pack_payload(first_id, second_id))
+    response = ActionPackResponse(
+        id=uuid4(),
+        project_id=uuid4(),
+        status="completed",
+        model="test-model",
+        source_ids=[first_id, second_id],
+        result_object_key="action-packs/test/action-pack.json",
+        generated_at=datetime.now(timezone.utc),
+        action_pack=pack,
+        output_options=["learning_workflow"],
+    )
+
+    workflow = _build_learning_workflow(
+        response,
+        focus_topics=["Arrays"],
+        mode="guided",
+    )
+    payload = workflow.model_dump_json().encode("utf-8")
+    evaluation = _workflow_evaluation(payload, "application/json")
+
+    assert len(workflow.stages) == 7
+    assert workflow.stages[0].headline == "Arrays"
+    assert any(
+        "Arrays" in item for item in workflow.stages[1].items
+    )
+    assert workflow.source_ids == [first_id, second_id]
+    assert evaluation.confidence == 0.96
 
 
 def test_evidence_references_are_validated_and_metrics_are_server_owned() -> None:

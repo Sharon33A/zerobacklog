@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 AssetType = Literal[
     "complete_action_pack",
     "note",
-    "visual",
+    "learning_workflow",
     "voice",
     "flashcards",
     "priority_problems",
@@ -90,12 +90,7 @@ class RegenerateAssetRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     voice_mode: Literal["normal", "quick_revision"] | None = None
-    visual_style: Literal[
-        "mind_map",
-        "flow_diagram",
-        "algorithm_flow",
-        "comparison_chart",
-    ] | None = None
+    workflow_mode: Literal["guided", "concise"] | None = None
 
 
 class CompareVersionsResponse(BaseModel):
