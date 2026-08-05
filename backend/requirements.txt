@@ -1,6 +1,8 @@
 fastapi==0.116.1
 genblaze-core==0.3.4
 genblaze-s3==0.3.5
+google-genai==2.13.0
+httpx==0.28.1
 pillow==11.3.0
 psycopg[binary]==3.3.4
 pydantic-settings==2.10.1

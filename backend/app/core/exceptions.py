@@ -10,6 +10,9 @@ from app.models.error import ErrorDetail, ErrorResponse
 from app.services.errors import (
     DuplicateUploadError,
     InfrastructureError,
+    ResourceActionError,
+    ResourceNotFoundError,
+    UrlValidationError,
     UploadValidationError,
 )
 
@@ -139,6 +142,42 @@ async def infrastructure_exception_handler(
     )
 
 
+async def resource_not_found_exception_handler(
+    request: Request, exception: Exception
+) -> JSONResponse:
+    if not isinstance(exception, ResourceNotFoundError):
+        raise exception
+    return _error_response(
+        status_code=status.HTTP_404_NOT_FOUND,
+        code=exception.code,
+        message=exception.message,
+    )
+
+
+async def resource_action_exception_handler(
+    request: Request, exception: Exception
+) -> JSONResponse:
+    if not isinstance(exception, ResourceActionError):
+        raise exception
+    return _error_response(
+        status_code=status.HTTP_409_CONFLICT,
+        code=exception.code,
+        message=exception.message,
+    )
+
+
+async def url_validation_exception_handler(
+    request: Request, exception: Exception
+) -> JSONResponse:
+    if not isinstance(exception, UrlValidationError):
+        raise exception
+    return _error_response(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        code=exception.code,
+        message=exception.message,
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register every application-wide exception mapping."""
     app.add_exception_handler(
@@ -152,6 +191,18 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(
         InfrastructureError,
         infrastructure_exception_handler,
+    )
+    app.add_exception_handler(
+        ResourceNotFoundError,
+        resource_not_found_exception_handler,
+    )
+    app.add_exception_handler(
+        UrlValidationError,
+        url_validation_exception_handler,
+    )
+    app.add_exception_handler(
+        ResourceActionError,
+        resource_action_exception_handler,
     )
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)

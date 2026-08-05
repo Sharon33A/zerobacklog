@@ -10,9 +10,10 @@ from app.main import app
 
 
 class FakeUploadService:
-    async def store(self, upload) -> UploadRecord:
+    async def store(self, upload, *, project_id) -> UploadRecord:
         return UploadRecord(
             id=uuid4(),
+            project_id=project_id,
             original_filename=upload.original_filename,
             object_key=f"uploads/test/{upload.sha256}.txt",
             content_type=upload.content_type,
@@ -42,6 +43,7 @@ def test_upload_endpoint_returns_stored_metadata() -> None:
     assert response.status_code == 201
     payload = response.json()["upload"]
     assert payload["filename"] == "notes.txt"
+    assert payload["project_id"]
     assert payload["status"] == "stored"
     assert payload["bucket"] == "test-bucket"
     assert len(payload["sha256"]) == 64

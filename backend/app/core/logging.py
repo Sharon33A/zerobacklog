@@ -15,6 +15,9 @@ _CONNECTION_STRING = re.compile(
     r"(?i)\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis)://[^\s]+"
 )
 _BEARER_TOKEN = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
+_QUERY_SECRET = re.compile(
+    r"(?i)([?&](?:key|api_key|token|access_token)=)[^&\s]+"
+)
 
 
 def redact_sensitive_text(value: object) -> str:
@@ -22,6 +25,7 @@ def redact_sensitive_text(value: object) -> str:
     text = str(value)
     text = _KEY_VALUE_SECRET.sub(r"\1\2[REDACTED]", text)
     text = _CONNECTION_STRING.sub(r"\1://[REDACTED]", text)
+    text = _QUERY_SECRET.sub(r"\1[REDACTED]", text)
     return _BEARER_TOKEN.sub("Bearer [REDACTED]", text)
 
 

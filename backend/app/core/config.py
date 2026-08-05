@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     app_env: str = "development"
     frontend_url: str = "http://localhost:3000"
     log_level: str = "INFO"
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_image_model: str = "gemini-3.1-flash-image"
+    gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
+    gemini_voice_name: str = "Kore"
+    generation_confidence_threshold: float = 0.72
 
     gemini_api_key: SecretStr | None = Field(default=None, repr=False)
     youtube_api_key: SecretStr | None = Field(default=None, repr=False)
@@ -34,6 +39,9 @@ class Settings(BaseSettings):
     b2_region: str | None = None
     max_upload_size_bytes: int = 25 * 1024 * 1024
     infrastructure_retry_attempts: int = 3
+    max_link_snapshot_bytes: int = 1024 * 1024
+    max_analysis_source_chars: int = 24_000
+    max_analysis_total_chars: int = 120_000
 
     model_config = SettingsConfigDict(
         env_file=BACKEND_DIRECTORY / ".env",

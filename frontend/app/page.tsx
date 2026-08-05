@@ -87,7 +87,7 @@ export default function Home() {
               <Link
                 className="primary-button"
                 aria-describedby="action-pack-status"
-                href="/upload"
+                href="/profile"
               >
                 Upload My Backlog
                 <ArrowIcon />
@@ -96,13 +96,16 @@ export default function Home() {
             </div>
           </div>
 
-          <aside className="action-pack-preview" aria-label="Future Action Pack preview">
+          <aside
+            className="action-pack-preview"
+            aria-label="Illustrative sample, not a generated Action Pack"
+          >
             <div className="preview-heading">
               <div>
-                <p>Action Pack</p>
+                <p>Illustrative sample</p>
                 <h2>Interview foundations</h2>
               </div>
-              <span>Preview</span>
+              <span>Not generated</span>
             </div>
 
             <div className="preview-focus">
@@ -127,22 +130,22 @@ export default function Home() {
             </dl>
 
             <div className="preview-assets">
-              <p>Planned learning assets</p>
+              <p>Example learning assets</p>
               <ul>
                 <li>
                   <span className="asset-icon">T</span>
                   Concise notes
-                  <span>Planned</span>
+                  <span>Generated on request</span>
                 </li>
                 <li>
                   <span className="asset-icon">D</span>
                   Visual map
-                  <span>Planned</span>
+                  <span>Generated on request</span>
                 </li>
                 <li>
                   <span className="asset-icon">V</span>
                   Voice lesson
-                  <span>Planned</span>
+                  <span>Generated on request</span>
                 </li>
               </ul>
             </div>
@@ -194,8 +197,8 @@ export default function Home() {
             </ol>
           </div>
           <p className="pipeline-note">
-            Pipeline shown for product direction; processing and generation
-            stages are not implemented in this foundation milestone.
+            Validation, extraction, evidence-backed Action Packs, generated
+            visual and voice assets, version history, and downloads are implemented.
           </p>
         </section>
       </main>
@@ -208,7 +211,7 @@ export default function Home() {
             <span>Built for learners ready to move forward.</span>
           </p>
         </div>
-        <p>Backblaze Generative Media Hackathon · Foundation milestone</p>
+        <p>Backblaze Generative Media Hackathon · Submission build</p>
       </footer>
     </div>
   );

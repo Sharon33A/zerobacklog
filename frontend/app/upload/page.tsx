@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { HealthStatus } from "@/components/health-status";
 import { UploadForm } from "@/components/upload-form";
+import { FlowProgress } from "@/components/flow-progress";
 
 export const metadata = {
-  title: "Upload your backlog — ZeroBacklog",
-  description: "Validate and store learning resources for ZeroBacklog.",
+  title: "Resource Readiness — ZeroBacklog",
+  description: "Upload, extract, and check learning resources for readiness.",
 };
 
 export default function UploadPage() {
@@ -23,24 +24,24 @@ export default function UploadPage() {
       </header>
 
       <main className="upload-page">
+        <FlowProgress current={1} />
         <section className="upload-intro" aria-labelledby="upload-title">
           <p className="eyebrow">
             <span aria-hidden="true" />
-            Upload and infrastructure milestone
+            Resource readiness
           </p>
-          <h1 id="upload-title">Bring the backlog together.</h1>
+          <h1 id="upload-title">Bring the backlog. Keep the clarity.</h1>
           <p>
-            Files are validated before they are stored. Successful uploads are
-            written to Backblaze B2 and recorded in Neon with a SHA-256
-            fingerprint for duplicate detection.
+            ZeroBacklog checks what is usable, relevant, readable, or repeated
+            before anything enters your future learning plan.
           </p>
         </section>
         <UploadForm />
         <aside className="upload-privacy">
-          <strong>What happens now</strong>
+          <strong>You stay in control</strong>
           <p>
-            This milestone stores valid resources only. Analysis, summaries,
-            and media generation are not running yet.
+            Nothing is silently discarded. Remove, replace, retry, or include
+            a flagged resource anyway.
           </p>
         </aside>
       </main>

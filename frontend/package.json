@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint app components lib types next.config.ts eslint.config.mjs postcss.config.mjs --max-warnings=0"
+    "lint": "eslint app components lib types tests next.config.ts eslint.config.mjs postcss.config.mjs --max-warnings=0",
+    "test:selection": "node --experimental-strip-types --test tests/generation-settings.test.ts"
   },
   "dependencies": {
     "next": "15.5.21",

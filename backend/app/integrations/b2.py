@@ -120,6 +120,23 @@ class GenblazeB2Storage:
                 "The file could not be stored. Please retry.",
             ) from exception
 
+    def get(self, key: str) -> bytes:
+        """Retrieve an object with the same bounded retry policy as uploads."""
+
+        try:
+            return run_with_retry(
+                lambda: self._get_backend().get(key),
+                operation_name="b2_get",
+                attempts=self._settings.infrastructure_retry_attempts,
+                is_retriable=lambda error: isinstance(error, StorageError)
+                and error.is_retriable,
+            )
+        except StorageError as exception:
+            raise InfrastructureError(
+                "storage_read_failed",
+                "The stored resource could not be read. Please retry.",
+            ) from exception
+
     def delete(self, key: str) -> None:
         try:
             self._get_backend().delete(key)

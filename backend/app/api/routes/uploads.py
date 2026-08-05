@@ -1,6 +1,8 @@
 """Validated source-upload endpoint."""
 
-from fastapi import APIRouter, File, Request, UploadFile, status
+from uuid import UUID, uuid4
+
+from fastapi import APIRouter, File, Form, Request, UploadFile, status
 
 from app.models.upload import UploadMetadata, UploadResponse
 from app.services.file_validation import validate_upload
@@ -17,6 +19,7 @@ router = APIRouter(prefix="/api/v1", tags=["uploads"])
 async def create_upload(
     request: Request,
     file: UploadFile = File(...),
+    project_id: UUID | None = Form(default=None),
 ) -> UploadResponse:
     settings = request.app.state.settings
     try:
@@ -27,5 +30,8 @@ async def create_upload(
     finally:
         await file.close()
 
-    record = await request.app.state.upload_service.store(validated)
+    record = await request.app.state.upload_service.store(
+        validated,
+        project_id=project_id or uuid4(),
+    )
     return UploadResponse(upload=UploadMetadata.from_record(record))

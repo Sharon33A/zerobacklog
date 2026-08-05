@@ -13,6 +13,7 @@ class UploadMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: UUID
+    project_id: UUID
     filename: str
     content_type: str
     size_bytes: int
@@ -26,6 +27,7 @@ class UploadMetadata(BaseModel):
     def from_record(cls, record: UploadRecord) -> "UploadMetadata":
         return cls(
             id=record.id,
+            project_id=record.project_id,
             filename=record.original_filename,
             content_type=record.content_type,
             size_bytes=record.size_bytes,

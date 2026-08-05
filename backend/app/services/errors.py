@@ -19,3 +19,21 @@ class InfrastructureError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+class ResourceNotFoundError(Exception):
+    def __init__(self) -> None:
+        super().__init__("The requested resource was not found.")
+        self.code = "resource_not_found"
+        self.message = "The requested resource was not found."
+
+
+class ResourceActionError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+class UrlValidationError(ResourceActionError):
+    """A public-link input or network-boundary validation failure."""

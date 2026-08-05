@@ -29,6 +29,8 @@ SUPPORTED_TYPES = {
     ".gif": ("image/gif", "image"),
     ".txt": ("text/plain", "text"),
     ".md": ("text/markdown", "text"),
+    ".srt": ("application/x-subrip", "text"),
+    ".vtt": ("text/vtt", "text"),
     ".csv": ("text/csv", "text"),
     ".json": ("application/json", "text"),
     ".zip": ("application/zip", "zip"),
@@ -70,7 +72,7 @@ async def validate_upload(
     if type_definition is None:
         raise UploadValidationError(
             "unsupported_file_type",
-            "Supported files are PDF, image, text, and ZIP formats.",
+            "Supported files are PDF, image, text, subtitle, and ZIP formats.",
         )
 
     content_type, category = type_definition
@@ -122,10 +124,9 @@ def _validate_pdf(data: bytes) -> None:
         raise UploadValidationError("invalid_pdf", "The PDF signature is invalid.")
     reader = PdfReader(io.BytesIO(data), strict=False)
     if reader.is_encrypted:
-        raise UploadValidationError(
-            "encrypted_pdf",
-            "Encrypted PDFs are not supported.",
-        )
+        # Preserve structurally valid encrypted resources so readiness can
+        # explain that they are unsupported and offer replacement.
+        return
     if not reader.pages:
         raise UploadValidationError("invalid_pdf", "The PDF contains no pages.")
 
@@ -172,11 +173,6 @@ def _validate_zip(data: bytes) -> None:
                 raise UploadValidationError(
                     "unsafe_zip_path",
                     "The ZIP contains an unsafe path.",
-                )
-            if entry.flag_bits & 0x1:
-                raise UploadValidationError(
-                    "encrypted_zip",
-                    "Encrypted ZIP files are not supported.",
                 )
             total_uncompressed += entry.file_size
             if total_uncompressed > MAX_ZIP_UNCOMPRESSED_BYTES:

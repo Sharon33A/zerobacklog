@@ -12,6 +12,10 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.services.uploads import UploadService
+from app.services.resources import ResourceService
+from app.services.links import LinkService
+from app.services.action_packs import ActionPackService
+from app.services.generated_assets import GeneratedAssetService
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +35,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         yield
         application.state.upload_service.close()
+        application.state.resource_service.close()
+        application.state.link_service.close()
+        application.state.action_pack_service.close()
+        application.state.generated_asset_service.close()
         logger.info("Stopping service=%s", app_settings.service_name)
 
     application = FastAPI(
@@ -41,12 +49,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.state.settings = app_settings
     application.state.upload_service = UploadService(app_settings)
+    application.state.resource_service = ResourceService(app_settings)
+    application.state.link_service = LinkService(app_settings)
+    application.state.action_pack_service = ActionPackService(app_settings)
+    application.state.generated_asset_service = GeneratedAssetService(app_settings)
 
     application.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["Accept", "Content-Type"],
     )
     register_exception_handlers(application)
